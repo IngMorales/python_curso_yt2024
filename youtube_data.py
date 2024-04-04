@@ -7,7 +7,7 @@ from pytube import YouTube
 app = Flask(__name__)
 
 # Asegúrate de reemplazar esto con una variable de entorno o alguna forma segura de manejar la clave API
-YOUTUBE_API_KEY = "AIzaSyCEUgtHL2lVSEA2jpuIYE9AL9aEnmnvxE0"
+YOUTUBE_API_KEY = ""
 YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3/videos"
 
 HTML_TEMPLATE = """
