@@ -6,7 +6,9 @@ def descargar_video(url):
         # Crear un objeto de YouTube
         yt = YouTube(url)
         # Obtener el stream de mayor resolución
-        video = yt.streams.get_highest_resolution()
+        # video = yt.streams.get_highest_resolution()
+        video = yt.streams.get_lowest_resolution()
+        # video = yt.streams.get_audio_only()
         # Descargar el video
         video.download()
         print(f"Video '{yt.title}' descargado exitosamente.")
