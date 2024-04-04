@@ -18,30 +18,25 @@ HTML_TEMPLATE = """
 <body>
 <div class="container mt-5">
   <h1>Descargar Videos de YouTube <i class="fas fa-video"></i></h1>
-  {% if not resoluciones %}
-    <form method="post" class="input-group mb-3">
-      <input type="text" class="form-control" placeholder="Ingrese la URL del video de YouTube" name="url" required>
-      <div class="input-group-append">
-        <button class="btn btn-outline-secondary" type="submit">Obtener Resoluciones</button>
-      </div>
-    </form>
-  {% else %}
-    <form method="post" class="input-group mb-3">
-      <input type="hidden" name="url" value="{{url}}">
-      <select class="form-control" name="resolucion">
-        {% for res in resoluciones %}
-          <option value="{{res.itag}}">{{res.resolution}}</option>
-        {% endfor %}
-      </select>
-      <div class="input-group-append">
-        <button class="btn btn-outline-secondary" type="submit">Descargar</button>
-      </div>
-    </form>
-  {% endif %}
-  {% if mensaje %}
-    <div class="alert alert-success" role="alert">
-      {{ mensaje }}
+  <form method="post" class="input-group mb-3">
+    <input type="text" class="form-control" placeholder="Ingrese la URL del video de YouTube" name="url" required>
+    <div class="input-group-append">
+      <button class="btn btn-outline-secondary" type="submit" name="action" value="search">Buscar Video</button>
     </div>
+  </form>
+  {% if streams %}
+    <h2>Seleccione la resolución para descargar el video</h2>
+    <form method="post">
+      <input type="hidden" name="url" value="{{url}}">
+      {% for stream in streams %}
+        <div class="card" style="margin-bottom: 10px;">
+          <div class="card-body">
+            <h5 class="card-title">{{ stream.resolution }} - Aprox. {{ stream.filesize // 1024 // 1024 }}MB</h5>
+            <button class="btn btn-primary" type="submit" name="itag" value="{{ stream.itag }}">Descargar</button>
+          </div>
+        </div>
+      {% endfor %}
+    </form>
   {% endif %}
 </div>
 <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
@@ -52,25 +47,25 @@ HTML_TEMPLATE = """
 """
 
 @app.route('/', methods=['GET', 'POST'])
-def descargar_video():
-    mensaje = ""
-    resoluciones = None
-    url = ""
+def home():
+    url = request.form.get('url')
+    action = request.form.get('action')
+    itag = request.form.get('itag')
+    streams = []
 
-    if request.method == 'POST':
-        url = request.form.get('url')
+    if url:
         yt = YouTube(url)
-        if 'resolucion' in request.form:
-            itag = request.form.get('resolucion')
-            video = yt.streams.get_by_itag(itag)
+        if action == 'search':
+            streams = yt.streams.filter(progressive=True).order_by('resolution')
+        elif itag:
+            stream = yt.streams.get_by_itag(itag)
             temp_dir = tempfile.mkdtemp()
-            video.download(output_path=temp_dir, filename="video.mp4")
-            return send_file(os.path.join(temp_dir, "video.mp4"), as_attachment=True)
-        else:
-            resoluciones = yt.streams.filter(progressive=True).order_by('resolution').desc()
-            return render_template_string(HTML_TEMPLATE, resoluciones=resoluciones, url=url)
+            filename = stream.default_filename
+            stream.download(output_path=temp_dir, filename=filename)
+            path = os.path.join(temp_dir, filename)
+            return send_file(path, as_attachment=True, download_name=filename)
 
-    return render_template_string(HTML_TEMPLATE, mensaje=mensaje, resoluciones=resoluciones)
+    return render_template_string(HTML_TEMPLATE, url=url, streams=streams)
 
 if __name__ == "__main__":
     app.run(debug=True)
