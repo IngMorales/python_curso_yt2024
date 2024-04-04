@@ -1,10 +1,9 @@
-from flask import Flask, request, render_template_string, send_file, redirect, url_for, session
+from flask import Flask, request, render_template_string, send_file, redirect, url_for
 import os
 import tempfile
 from pytube import YouTube
 
 app = Flask(__name__)
-app.secret_key = 'AIzaSyCEUgtHL2lVSEA2jpuIYE9AL9aEnmnvxE0'  # Cambia esto por una clave secreta real
 
 HTML_TEMPLATE = """
 <!doctype html>
@@ -18,11 +17,7 @@ HTML_TEMPLATE = """
   <style>
     body { background-color: #f7f8fc; }
     .container { max-width: 800px; }
-    .video-thumbnail {
-      max-width: 80%;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,.1);
-    }
+    .video-thumbnail { max-width: 70%; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
     .search-box { display: flex; margin-bottom: 2rem; }
     .search-box input { flex-grow: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
     .search-box button { border-top-left-radius: 0; border-bottom-left-radius: 0; }
@@ -105,31 +100,34 @@ def home():
     if request.method == 'POST':
         url = request.form.get('url')
         itag = request.form.get('itag')
-        
+        video_info = None
+        streams = []
+
         if url:
             yt = YouTube(url)
             if itag:
-                # Procesar la descarga del stream seleccionado
                 stream = yt.streams.get_by_itag(itag)
                 temp_dir = tempfile.mkdtemp()
                 filename = stream.default_filename
                 stream.download(output_path=temp_dir, filename=filename)
                 path = os.path.join(temp_dir, filename)
                 return send_file(path, as_attachment=True, download_name=filename)
-            
-            # Almacenar información de video y streams en la sesión
-            session['video_info'] = {'thumbnail_url': yt.thumbnail_url, 'title': yt.title, 'url': url}
-            session['streams'] = [{
-                'itag': s.itag,
-                'resolution': s.resolution,
-                'filesize': s.filesize
-            } for s in yt.streams.filter(file_extension='mp4').filter(only_video=True).order_by('resolution').desc()]
-            return redirect(url_for('home'))
+            else:
+                video_info = {'thumbnail_url': yt.thumbnail_url, 'title': yt.title, 'url': url}
+                streams = [{
+                    'itag': s.itag,
+                    'resolution': s.resolution,
+                    'filesize': s.filesize
+                } for s in yt.streams.filter(file_extension='mp4').filter(only_video=True).order_by('resolution').desc()]
+                # Remove duplicate resolutions, keeping the highest quality (first) stream
+                seen_resolutions = set()
+                streams = [x for x in streams if not (x['resolution'] in seen_resolutions or seen_resolutions.add(x['resolution']))]
+
+        return render_template_string(HTML_TEMPLATE, url=url, video_info=video_info, streams=streams)
     else:
-        # Intentar recuperar la información de la sesión
-        video_info = session.pop('video_info', None)
-        streams = session.pop('streams', None)
-        return render_template_string(HTML_TEMPLATE, video_info=video_info, streams=streams)
+        # Para solicitudes GET, retorna la plantilla sin información de video, lo que reinicia la página
+        return render_template_string(HTML_TEMPLATE)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
